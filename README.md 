@@ -1,0 +1,296 @@
+# Autonomous FNOL Insurance Claims Processing Agent
+
+## Overview
+
+The **Autonomous FNOL Insurance Claims Processing Agent** is a lightweight AI-powered system designed to process First Notice of Loss (FNOL) documents. It extracts structured claim information from unstructured PDFs using a Large Language Model (LLM), validates the extracted data, and deterministically routes claims to the appropriate workflow.
+
+This project demonstrates how AI can be safely integrated into enterprise decision pipelines by combining probabilistic LLM outputs with rule-based validation and routing.
+
+---
+
+## Key Features
+
+✅ LLM-powered extraction from unstructured FNOL documents
+✅ Structured JSON output for downstream systems
+✅ Automatic detection of missing mandatory fields
+✅ Deterministic routing engine for workflow decisions
+✅ Fraud signal detection with contextual filtering
+✅ Confidence-based manual review gating
+✅ Retry logic for improved LLM reliability
+✅ Batch processing with controlled concurrency
+✅ Clean separation between extraction and decision layers
+✅ Secure secret management using environment variables
+
+---
+
+## Architecture
+
+```
+                ┌────────────────────┐
+                │   FNOL Document     │
+                └─────────┬──────────┘
+                          ↓
+                ┌────────────────────┐
+                │   PDF Text Reader   │
+                └─────────┬──────────┘
+                          ↓
+                ┌────────────────────┐
+                │ FNOL Extraction     │
+                │ Agent (LLM)         │
+                └─────────┬──────────┘
+                          ↓
+                ┌────────────────────┐
+                │ Claim Validator     │
+                └─────────┬──────────┘
+                          ↓
+                ┌────────────────────┐
+                │ Routing Engine      │
+                │ (Deterministic)     │
+                └─────────┬──────────┘
+                          ↓
+                ┌────────────────────┐
+                │ Agent Response      │
+                └────────────────────┘
+```
+
+---
+
+## Design Philosophy
+
+### Hybrid AI + Deterministic Rules
+
+LLMs are powerful but non-deterministic, while insurance workflows demand predictability and auditability.
+
+This system uses:
+
+**AI for comprehension**
+→ Extracting structured data from complex documents
+
+**Rules for decision-making**
+→ Ensuring consistent, explainable routing
+
+This hybrid pattern reflects real-world enterprise AI architecture.
+
+---
+
+## Response Schema
+
+```json
+{
+  "extractedFields": {},
+  "missingFields": [],
+  "recommendedRoute": "",
+  "reasoning": "",
+  "confidenceScore": 0,
+  "llmRoute": ""
+}
+```
+
+### Separation of Concerns
+
+**Claim → Extraction Model**
+Contains only structured data extracted from the document.
+
+**AgentResponse → Decision Contract**
+Contains routing decisions, confidence scores, and reasoning.
+
+This prevents AI metadata from leaking into domain objects and keeps the system modular.
+
+---
+
+## Routing Strategy
+
+Claims are routed using deterministic safeguards:
+
+| Condition                  | Route               |
+| -------------------------- | ------------------- |
+| Confidence < 70            | Manual Review       |
+| Missing mandatory fields   | Manual Review       |
+| Injury-related claims      | Specialist Queue    |
+| Fraud indicators detected  | Investigation       |
+| Estimated damage < $25,000 | Fast Track          |
+| Otherwise                  | Standard Processing |
+
+This ensures responsible automation in a risk-sensitive domain.
+
+---
+
+## Fraud Detection
+
+To reduce false positives:
+
+* Boilerplate fraud warning sections are ignored
+* Contextual fraud keywords are evaluated
+* A scoring threshold is used instead of naive keyword matching
+
+This approach prevents unnecessary investigations while maintaining risk awareness.
+
+---
+
+## LLM Guardrails
+
+The extraction prompt enforces strict constraints:
+
+* Returns **valid JSON only**
+* No markdown or explanations
+* Confidence score capped below 95
+* Mandatory routing suggestion
+* Ignores disclaimers and boilerplate text
+
+These guardrails significantly reduce parsing failures and improve reliability.
+
+---
+
+## Failure Handling & Reliability
+
+Production-style resilience patterns are included:
+
+* Retry mechanism for LLM calls
+* Safe JSON extraction
+* Validation before routing
+* Confidence-based fallback to manual review
+
+---
+
+## Tech Stack
+
+* **Java 17**
+* **LangChain4j**
+* **Groq LLM**
+* **Apache PDFBox**
+* **Jackson**
+* **ExecutorService** for concurrency
+
+---
+
+## Security
+
+Secrets are managed via **environment variables** to follow secure deployment practices.
+No API keys are stored in the repository.
+
+---
+
+## How to Run
+
+### 1. Clone the Repository
+
+```
+git clone <repo-url>
+cd autonomous-fnol-claims-agent
+```
+
+---
+
+### 2. Configure Environment Variables
+
+The application reads credentials from system environment variables.
+
+#### Mac / Linux
+
+```
+export GROQ_API_KEY="your_api_key"
+export GROQ_BASE_URL="your_base_url"
+export GROQ_MODEL="your_model"
+```
+
+#### Windows (PowerShell)
+
+```
+setx GROQ_API_KEY "your_api_key"
+setx GROQ_BASE_URL "your_base_url"
+setx GROQ_MODEL "your_model"
+```
+
+Restart your terminal after setting variables.
+
+---
+
+### 3. Add Sample FNOL Documents
+
+Place PDF files inside:
+
+```
+src/main/resources/claims/
+```
+
+---
+
+### 4. Build the Project
+
+```
+mvn clean install
+```
+
+---
+
+### 5. Run the Application
+
+Run the `Main` class from your IDE
+
+OR
+
+```
+mvn exec:java -Dexec.mainClass="com.insurance.Main"
+```
+
+The agent will automatically process FNOL documents and output structured claim decisions.
+
+---
+
+## Example Output
+
+```json
+{
+  "extractedFields": {
+    "policyNumber": "AUTO-PL-983421",
+    "policyholderName": "Rahul Sharma",
+    "dateOfLoss": "02/14/2026",
+    "location": "Dallas, TX",
+    "claimType": "Automobile",
+    "estimatedDamage": 8500
+  },
+  "missingFields": [],
+  "recommendedRoute": "Fast Track",
+  "reasoning": "Low damage with no fraud indicators.",
+  "confidenceScore": 80,
+  "llmRoute": "Fast Track"
+}
+```
+
+---
+
+## Tradeoffs
+
+* Prioritized reliability over extracting every possible field.
+* Deterministic routing overrides LLM recommendations when conflicts occur.
+* Chose a lightweight architecture to align with assessment scope rather than introducing microservices.
+
+---
+
+## Future Improvements
+
+* Model fallback strategy
+* Extraction accuracy evaluation pipeline
+* Observability (metrics + tracing)
+* REST API interface
+* Human-in-the-loop review workflow
+* Containerization for deployment
+
+---
+
+## Why This Project Matters
+
+Insurance is a high-risk domain where blind AI automation is dangerous.
+
+This project demonstrates how to:
+
+✅ Safely integrate LLMs into production-style workflows
+✅ Maintain auditability and explainability
+✅ Enforce deterministic safeguards
+✅ Design enterprise-oriented AI systems
+
+---
+
+## Author
+
+Sourav Kumar Verma
